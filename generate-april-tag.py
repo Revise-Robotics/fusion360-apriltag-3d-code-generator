@@ -131,6 +131,8 @@ TAG36H11_CODES = (
 DIM = 6                  # 6x6 data bits
 AREA = DIM * DIM         # 36 data bits per tag
 TAG_N = DIM + 2          # 8x8 including 1-pixel black border
+WHITE_BORDER = 1         # white quiet-zone pixels on each side
+TOTAL_N = TAG_N + 2 * WHITE_BORDER  # 10x10 overall grid
 
 DEFAULT_TAG_ID = 10
 DEFAULT_WIDTH_MM = 80.0  # outer square edge length
@@ -249,7 +251,7 @@ def run(_context: str):
 
         grid = build_grid(tag_id)
         total_cm = mm_to_cm(width_mm)
-        pixel_cm = total_cm / TAG_N
+        pixel_cm = total_cm / TOTAL_N
         thick_cm = mm_to_cm(depth_mm)
 
         root = design.rootComponent
@@ -291,7 +293,7 @@ def run(_context: str):
 
         split_sketch = root.sketches.add(top_plane)
         lines = split_sketch.sketchCurves.sketchLines
-        for i in range(1, TAG_N):
+        for i in range(1, TOTAL_N):
             y = i * pixel_cm
             lines.addByTwoPoints(
                 adsk.core.Point3D.create(0, y, 0),
@@ -333,19 +335,30 @@ def run(_context: str):
         white_app = get_or_copy_appearance(design, source_white, 'AprilTag_White')
         black_app = get_or_copy_appearance(design, source_black, 'AprilTag_Black')
 
-        # 6. Paint the whole body black, then override each top sub-face
-        #    with white where the grid bit is 1.
-        body.appearance = black_app
-
+        # 6. Paint every face: sides/bottom are white, top pixels follow the
+        #    tag grid (white quiet-zone border + black/white data cells).
         for face in body.faces:
             c = face.centroid
             if abs(c.z - thick_cm) > 1e-6:
+                # Side or bottom face — white so the whole surround is white.
+                face.appearance = white_app
                 continue
             col = int(c.x / pixel_cm)
             row_from_bottom = int(c.y / pixel_cm)
-            row = TAG_N - 1 - row_from_bottom
-            if 0 <= row < TAG_N and 0 <= col < TAG_N:
-                face.appearance = white_app if grid[row][col] == 1 else black_app
+            row = TOTAL_N - 1 - row_from_bottom
+            if not (0 <= row < TOTAL_N and 0 <= col < TOTAL_N):
+                continue
+            # Outer white quiet-zone ring
+            in_white_border = (
+                row < WHITE_BORDER or row >= TOTAL_N - WHITE_BORDER
+                or col < WHITE_BORDER or col >= TOTAL_N - WHITE_BORDER
+            )
+            if in_white_border:
+                face.appearance = white_app
+            else:
+                tag_row = row - WHITE_BORDER
+                tag_col = col - WHITE_BORDER
+                face.appearance = white_app if grid[tag_row][tag_col] == 1 else black_app
 
     except:  # pylint:disable=bare-except
         app.log(f'Failed:\n{traceback.format_exc()}')
