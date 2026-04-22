@@ -1,11 +1,10 @@
 {
-	"autodeskProduct":	"Fusion",
+	"autodeskProduct":	"Fusion360",
 	"type":	"script",
 	"author":	"",
 	"description":	{
-		"":	""
+		"":	"Generate a two-color AprilTag 36h11 body in the active Fusion design."
 	},
-	"version":	"",
 	"supportedOS":	"windows|mac",
 	"editEnabled":	true,
 	"iconFilename":	"ScriptIcon.svg"
